@@ -86,6 +86,10 @@ class SynthConfig:
     aW: float = 1.0
     sigma_w: float = 0.8
 
+    # Linearity control
+    linear_treatment: bool = True               # if False, use non-linear treatment assignment
+    linear_outcome: bool = True                 # if False, use non-linear outcome model
+
 
 @dataclass
 class SynthParams:
@@ -119,7 +123,20 @@ def generate_synthetic_nc_cox(cfg: SynthConfig) -> Tuple[pd.DataFrame, pd.DataFr
 
     # 3) Treatment A from logistic model of (X,U)
     alpha = rng.normal(scale=0.5, size=p)
-    linpred = X @ alpha + cfg.gamma_u_in_a * U
+    
+    if cfg.linear_treatment:
+        # Linear: standard approach
+        linpred = X @ alpha + cfg.gamma_u_in_a * U
+    else:
+        # Non-linear: add sigmoid transformations and interactions
+        X_nonlinear = np.column_stack([
+            sigmoid(X[:, i]) for i in range(min(3, p))  # sigmoid of first few features
+        ] + [
+            X[:, i] * X[:, (i+1) % p] for i in range(min(2, p))  # pairwise interactions
+        ])
+        alpha_nonlinear = rng.normal(scale=0.3, size=X_nonlinear.shape[1])
+        linpred = X_nonlinear @ alpha_nonlinear + cfg.gamma_u_in_a * sigmoid(U)
+    
     b0 = calibrate_intercept_for_prevalence(linpred, cfg.a_prevalence)
     p_a = sigmoid(b0 + linpred)
     A = rng.binomial(1, p_a, size=n).astype(int)
@@ -128,8 +145,25 @@ def generate_synthetic_nc_cox(cfg: SynthConfig) -> Tuple[pd.DataFrame, pd.DataFr
     beta_t = rng.normal(scale=0.4, size=p)
     u_t = rng.random(n)
 
-    eta_t0 = X @ beta_t + cfg.beta_u_in_t * U + cfg.tau_log_hr * 0.0
-    eta_t1 = X @ beta_t + cfg.beta_u_in_t * U + cfg.tau_log_hr * 1.0
+    if cfg.linear_outcome:
+        # Linear: standard Cox PH model
+        eta_t0 = X @ beta_t + cfg.beta_u_in_t * U + cfg.tau_log_hr * 0.0
+        eta_t1 = X @ beta_t + cfg.beta_u_in_t * U + cfg.tau_log_hr * 1.0
+    else:
+        # Non-linear: add non-linear transformations
+        # Use polynomial terms and sigmoid transformations
+        X_squared = X[:, :min(2, p)] ** 2  # squared terms for first few features
+        X_interact = X[:, 0:1] * U.reshape(-1, 1)  # interaction with U
+        
+        beta_squared = rng.normal(scale=0.2, size=X_squared.shape[1])
+        beta_interact = rng.normal(scale=0.2, size=X_interact.shape[1])
+        
+        nonlinear_part = (X_squared @ beta_squared + 
+                         X_interact @ beta_interact + 
+                         0.5 * sigmoid(U))
+        
+        eta_t0 = X @ beta_t + cfg.beta_u_in_t * U + nonlinear_part + cfg.tau_log_hr * 0.0
+        eta_t1 = X @ beta_t + cfg.beta_u_in_t * U + nonlinear_part + cfg.tau_log_hr * 1.0
 
     T0 = weibull_ph_time_paper(u_t, k=cfg.k_t, lam=cfg.lam_t, eta=eta_t0)
     T1 = weibull_ph_time_paper(u_t, k=cfg.k_t, lam=cfg.lam_t, eta=eta_t1)

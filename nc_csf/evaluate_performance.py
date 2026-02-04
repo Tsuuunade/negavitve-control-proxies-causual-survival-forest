@@ -42,6 +42,7 @@ def run_experiment(n, p_x, seed,
                    k_t, lam_t, tau_log_hr, beta_u_in_t,
                    k_c, lam_c, beta_u_in_c, target_censor_rate, max_censor_calib_iter, censor_lam_lo, censor_lam_hi, admin_censor_time,
                    aZ, aW, sigma_z, sigma_w,
+                   linear_treatment, linear_outcome,
                    **kwargs):
     """
     Run single experiment with configurable data generation parameters.
@@ -53,6 +54,7 @@ def run_experiment(n, p_x, seed,
                    k_t, lam_t, tau_log_hr, beta_u_in_t,
                    k_c, lam_c, beta_u_in_c, target_censor_rate, max_censor_calib_iter, censor_lam_lo, censor_lam_hi, admin_censor_time,
                    aZ, aW, sigma_z, sigma_w,
+                   linear_treatment, linear_outcome,
                    **kwargs
     )
     obs_df, truth_df, params = generate_synthetic_nc_cox(cfg)
