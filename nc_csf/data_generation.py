@@ -51,31 +51,31 @@ def weibull_ph_time_paper(u01: np.ndarray, k: float, lam: float, eta: np.ndarray
 
 @dataclass
 class SynthConfig:
-    n: int = 5000
-    p_x: int = 10
+    n: int = 5000                               # sample size
+    p_x: int = 10                               # number of covariates
     seed: int = 123
 
     # Treatment A: P(A=1 | X,U)
-    a_prevalence: float = 0.5
-    gamma_u_in_a: float = 1.0  # U -> A strength
+    a_prevalence: float = 0.5                   # target treatment prevalence
+    gamma_u_in_a: float = 1.0                   # U -> A strength
 
     # Event time model (Weibull Cox PH)
-    k_t: float = 1.5
-    lam_t: float = 0.4
-    tau_log_hr: float = -0.6   # treatment effect (log hazard ratio)
-    beta_u_in_t: float = 0.8   # U -> event time
+    k_t: float = 1.5                            # Weibull shape
+    lam_t: float = 0.4                          # Weibull scale
+    tau_log_hr: float = -0.6                    # log hazard ratio for treatment effect (tau)
+    beta_u_in_t: float = 0.8                    # U -> event time
 
     # Censoring time model (Weibull Cox PH)
-    k_c: float = 1.2
-    lam_c: Optional[float] = None
-    beta_u_in_c: float = 0.3
+    k_c: float = 1.2                            # Weibull shape
+    lam_c: Optional[float] = None               # Weibull scale (if None, will be calibrated)
+    beta_u_in_c: float = 0.3                    # strength of unmeasured confounding in censoring (beta_U)
     target_censor_rate: float = 0.35
-    max_censor_calib_iter: int = 60
+    max_censor_calib_iter: int = 60             # iteration control for binary search when calibrating censoring
     censor_lam_lo: float = 1e-8
     censor_lam_hi: float = 1e6
 
     # Optional admin censoring
-    admin_censor_time: Optional[float] = None
+    admin_censor_time: Optional[float] = None   # a fixed administrative censoring cutoff time
 
     # Proxies:
     # Z = aZ*U + X'bZ + epsZ
