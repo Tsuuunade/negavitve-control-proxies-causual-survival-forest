@@ -96,6 +96,8 @@ class SynthParams:
     b_z: np.ndarray
     b_w: np.ndarray
     beta_t: np.ndarray
+    beta_squared: Optional[np.ndarray] = None
+    beta_interact: Optional[np.ndarray] = None
 
 
 def generate_synthetic_nc_cox(cfg: SynthConfig) -> Tuple[pd.DataFrame, pd.DataFrame, SynthParams]:
@@ -144,6 +146,9 @@ def generate_synthetic_nc_cox(cfg: SynthConfig) -> Tuple[pd.DataFrame, pd.DataFr
     # 4) Potential event times T0,T1 (shared uniform u_t)
     beta_t = rng.normal(scale=0.4, size=p)
     u_t = rng.random(n)
+
+    beta_squared = None
+    beta_interact = None
 
     if cfg.linear_outcome:
         # Linear: standard Cox PH model
@@ -224,9 +229,13 @@ def generate_synthetic_nc_cox(cfg: SynthConfig) -> Tuple[pd.DataFrame, pd.DataFr
     truth_df["C1"] = C1
     truth_df["T"] = T
     truth_df["C"] = C
+    # Store eta values for CATE computation
+    truth_df["eta_t0"] = eta_t0
+    truth_df["eta_t1"] = eta_t1
     truth_df.attrs["lam_c_used"] = lam_c_used
 
-    params = SynthParams(b_z=b_z, b_w=b_w, beta_t=beta_t)
+    params = SynthParams(b_z=b_z, b_w=b_w, beta_t=beta_t, 
+                        beta_squared=beta_squared, beta_interact=beta_interact)
     return observed_df, truth_df, params
 
 
@@ -242,33 +251,28 @@ def add_ground_truth_cate(
     Adds to truth_df:
       - CATE_XU_eq7: E[T(1)-T(0) | X, U] (oracle)
       - ITE_T1_minus_T0: sample ITE
+    
+    For Weibull PH model: E[T | η] = λ * Γ(1 + 1/k) * exp(-η/k)
+    Therefore: CATE = E[T(1) - T(0) | X,U] = λ * Γ(1 + 1/k) * (exp(-η₁/k) - exp(-η₀/k))
+    
+    This formula works for both linear and nonlinear predictors.
     """
     obs = observed_df.copy()
     tru = truth_df.copy()
 
-    x_cols = sorted([c for c in obs.columns if c.startswith("X")], key=lambda s: int(s[1:]))
-    X = obs[x_cols].to_numpy()
-
     k = float(cfg.k_t)
     lam = float(cfg.lam_t)
-    tau = float(cfg.tau_log_hr)
-    beta_u = float(cfg.beta_u_in_t)
-
     G = math.gamma(1.0 + 1.0 / k)
-    xb = X @ params.beta_t
 
-    # Eq.(7): E[T(1)-T(0) | X, U] (oracle)
-    U = tru["U"].to_numpy()
-    cate_xu = (
-        lam * G
-        * np.exp(-(1.0 / k) * (xb + beta_u * U))
-        * (np.exp(-tau / k) - 1.0)
-    )
-
-    # Sample ITE
     ite = tru["T1"].to_numpy() - tru["T0"].to_numpy()
-
-    tru["CATE_XU_eq7"] = cate_xu
     tru["ITE_T1_minus_T0"] = ite
+
+    eta_t0 = tru["eta_t0"].to_numpy()
+    eta_t1 = tru["eta_t1"].to_numpy()
+        
+    # General formula for Weibull PH CATE (generalizes Eq. 7)
+    # E[T(1) - T(0) | X,U] = λ * Γ(1 + 1/k) * (exp(-η₁/k) - exp(-η₀/k))
+    cate_xu = lam * G * (np.exp(-eta_t1 / k) - np.exp(-eta_t0 / k))
+    tru["CATE_XU_eq7"] = cate_xu
 
     return obs, tru
