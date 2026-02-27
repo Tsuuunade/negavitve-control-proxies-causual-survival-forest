@@ -7,8 +7,8 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from scipy.stats import pearsonr, spearmanr
-from .data_generation import SynthConfig, generate_synthetic_nc_cox, add_ground_truth_cate
-from .models import NCCausalForestDML, NCCausalForestDMLOracle, BaselineCausalForestDML
+from data_generation import SynthConfig, generate_synthetic_nc_cox, add_ground_truth_cate
+from models import NCCausalForestDML, NCCausalForestDMLOracle, BaselineCausalForestDML
 
 
 def evaluate_model(true_cate, pred_cate, name):
@@ -37,26 +37,9 @@ def evaluate_model(true_cate, pred_cate, name):
     }
 
 
-def run_experiment(n, p_x, seed,
-                   a_prevalence, gamma_u_in_a,
-                   k_t, lam_t, tau_log_hr, beta_u_in_t,
-                   k_c, lam_c, beta_u_in_c, target_censor_rate, max_censor_calib_iter, censor_lam_lo, censor_lam_hi, admin_censor_time,
-                   aZ, aW, sigma_z, sigma_w,
-                   linear_treatment, linear_outcome,
-                   **kwargs):
-    """
-    Run single experiment with configurable data generation parameters.
-
-    """
-    cfg = SynthConfig(
-                   n, p_x, seed,
-                   a_prevalence, gamma_u_in_a,
-                   k_t, lam_t, tau_log_hr, beta_u_in_t,
-                   k_c, lam_c, beta_u_in_c, target_censor_rate, max_censor_calib_iter, censor_lam_lo, censor_lam_hi, admin_censor_time,
-                   aZ, aW, sigma_z, sigma_w,
-                   linear_treatment, linear_outcome,
-                   **kwargs
-    )
+def run_experiment(seed, gamma_u=1.5, n=2000):
+    """Run single experiment."""
+    cfg = SynthConfig(n=n, gamma_u_in_a=gamma_u, seed=seed)
     obs_df, truth_df, params = generate_synthetic_nc_cox(cfg)
     obs_df, truth_df = add_ground_truth_cate(obs_df, truth_df, cfg, params)
     
@@ -99,6 +82,8 @@ def run_experiment(n, p_x, seed,
     oracle.fit(Y=Y_tr, T=A_tr, X=X_tr, W=U_tr)
     pred_oracle = oracle.effect(X_te).ravel()
     results.append(evaluate_model(cate_te, pred_oracle, 'Oracle'))
+    
+    return pd.DataFrame(results), cate_te, pred_baseline, pred_nccsf, pred_oracle
     
     return pd.DataFrame(results), cate_te, pred_baseline, pred_nccsf, pred_oracle
 

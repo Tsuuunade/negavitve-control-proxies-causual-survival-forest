@@ -51,31 +51,31 @@ def weibull_ph_time_paper(u01: np.ndarray, k: float, lam: float, eta: np.ndarray
 
 @dataclass
 class SynthConfig:
-    n: int = 5000                               # sample size
-    p_x: int = 10                               # number of covariates
+    n: int = 5000
+    p_x: int = 10
     seed: int = 123
 
     # Treatment A: P(A=1 | X,U)
-    a_prevalence: float = 0.5                   # target treatment prevalence
-    gamma_u_in_a: float = 1.0                   # U -> A strength
+    a_prevalence: float = 0.5
+    gamma_u_in_a: float = 1.0  # U -> A strength
 
     # Event time model (Weibull Cox PH)
-    k_t: float = 1.5                            # Weibull shape
-    lam_t: float = 0.4                          # Weibull scale
-    tau_log_hr: float = -0.6                    # log hazard ratio for treatment effect (tau)
-    beta_u_in_t: float = 0.8                    # U -> event time
+    k_t: float = 1.5
+    lam_t: float = 0.4
+    tau_log_hr: float = -0.6   # treatment effect (log hazard ratio)
+    beta_u_in_t: float = 0.8   # U -> event time
 
     # Censoring time model (Weibull Cox PH)
-    k_c: float = 1.2                            # Weibull shape
-    lam_c: Optional[float] = None               # Weibull scale (if None, will be calibrated)
-    beta_u_in_c: float = 0.3                    # strength of unmeasured confounding in censoring (beta_U)
+    k_c: float = 1.2
+    lam_c: Optional[float] = None
+    beta_u_in_c: float = 0.3
     target_censor_rate: float = 0.35
-    max_censor_calib_iter: int = 60             # iteration control for binary search when calibrating censoring
+    max_censor_calib_iter: int = 60
     censor_lam_lo: float = 1e-8
     censor_lam_hi: float = 1e6
 
     # Optional admin censoring
-    admin_censor_time: Optional[float] = None   # a fixed administrative censoring cutoff time
+    admin_censor_time: Optional[float] = None
 
     # Proxies:
     # Z = aZ*U + X'bZ + epsZ
@@ -86,18 +86,12 @@ class SynthConfig:
     aW: float = 1.0
     sigma_w: float = 0.8
 
-    # Linearity control
-    linear_treatment: bool = True               # if False, use non-linear treatment assignment
-    linear_outcome: bool = True                 # if False, use non-linear outcome model
-
 
 @dataclass
 class SynthParams:
     b_z: np.ndarray
     b_w: np.ndarray
     beta_t: np.ndarray
-    beta_squared: Optional[np.ndarray] = None
-    beta_interact: Optional[np.ndarray] = None
 
 
 def generate_synthetic_nc_cox(cfg: SynthConfig) -> Tuple[pd.DataFrame, pd.DataFrame, SynthParams]:
@@ -125,20 +119,7 @@ def generate_synthetic_nc_cox(cfg: SynthConfig) -> Tuple[pd.DataFrame, pd.DataFr
 
     # 3) Treatment A from logistic model of (X,U)
     alpha = rng.normal(scale=0.5, size=p)
-    
-    if cfg.linear_treatment:
-        # Linear: standard approach
-        linpred = X @ alpha + cfg.gamma_u_in_a * U
-    else:
-        # Non-linear: add sigmoid transformations and interactions
-        X_nonlinear = np.column_stack([
-            sigmoid(X[:, i]) for i in range(min(3, p))  # sigmoid of first few features
-        ] + [
-            X[:, i] * X[:, (i+1) % p] for i in range(min(2, p))  # pairwise interactions
-        ])
-        alpha_nonlinear = rng.normal(scale=0.3, size=X_nonlinear.shape[1])
-        linpred = X_nonlinear @ alpha_nonlinear + cfg.gamma_u_in_a * sigmoid(U)
-    
+    linpred = X @ alpha + cfg.gamma_u_in_a * U
     b0 = calibrate_intercept_for_prevalence(linpred, cfg.a_prevalence)
     p_a = sigmoid(b0 + linpred)
     A = rng.binomial(1, p_a, size=n).astype(int)
@@ -147,28 +128,8 @@ def generate_synthetic_nc_cox(cfg: SynthConfig) -> Tuple[pd.DataFrame, pd.DataFr
     beta_t = rng.normal(scale=0.4, size=p)
     u_t = rng.random(n)
 
-    beta_squared = None
-    beta_interact = None
-
-    if cfg.linear_outcome:
-        # Linear: standard Cox PH model
-        eta_t0 = X @ beta_t + cfg.beta_u_in_t * U + cfg.tau_log_hr * 0.0
-        eta_t1 = X @ beta_t + cfg.beta_u_in_t * U + cfg.tau_log_hr * 1.0
-    else:
-        # Non-linear: add non-linear transformations
-        # Use polynomial terms and sigmoid transformations
-        X_squared = X[:, :min(2, p)] ** 2  # squared terms for first few features
-        X_interact = X[:, 0:1] * U.reshape(-1, 1)  # interaction with U
-        
-        beta_squared = rng.normal(scale=0.2, size=X_squared.shape[1])
-        beta_interact = rng.normal(scale=0.2, size=X_interact.shape[1])
-        
-        nonlinear_part = (X_squared @ beta_squared + 
-                         X_interact @ beta_interact + 
-                         0.5 * sigmoid(U))
-        
-        eta_t0 = X @ beta_t + cfg.beta_u_in_t * U + nonlinear_part + cfg.tau_log_hr * 0.0
-        eta_t1 = X @ beta_t + cfg.beta_u_in_t * U + nonlinear_part + cfg.tau_log_hr * 1.0
+    eta_t0 = X @ beta_t + cfg.beta_u_in_t * U + cfg.tau_log_hr * 0.0
+    eta_t1 = X @ beta_t + cfg.beta_u_in_t * U + cfg.tau_log_hr * 1.0
 
     T0 = weibull_ph_time_paper(u_t, k=cfg.k_t, lam=cfg.lam_t, eta=eta_t0)
     T1 = weibull_ph_time_paper(u_t, k=cfg.k_t, lam=cfg.lam_t, eta=eta_t1)
@@ -229,13 +190,9 @@ def generate_synthetic_nc_cox(cfg: SynthConfig) -> Tuple[pd.DataFrame, pd.DataFr
     truth_df["C1"] = C1
     truth_df["T"] = T
     truth_df["C"] = C
-    # Store eta values for CATE computation
-    truth_df["eta_t0"] = eta_t0
-    truth_df["eta_t1"] = eta_t1
     truth_df.attrs["lam_c_used"] = lam_c_used
 
-    params = SynthParams(b_z=b_z, b_w=b_w, beta_t=beta_t, 
-                        beta_squared=beta_squared, beta_interact=beta_interact)
+    params = SynthParams(b_z=b_z, b_w=b_w, beta_t=beta_t)
     return observed_df, truth_df, params
 
 
@@ -251,28 +208,33 @@ def add_ground_truth_cate(
     Adds to truth_df:
       - CATE_XU_eq7: E[T(1)-T(0) | X, U] (oracle)
       - ITE_T1_minus_T0: sample ITE
-    
-    For Weibull PH model: E[T | η] = λ * Γ(1 + 1/k) * exp(-η/k)
-    Therefore: CATE = E[T(1) - T(0) | X,U] = λ * Γ(1 + 1/k) * (exp(-η₁/k) - exp(-η₀/k))
-    
-    This formula works for both linear and nonlinear predictors.
     """
     obs = observed_df.copy()
     tru = truth_df.copy()
 
+    x_cols = sorted([c for c in obs.columns if c.startswith("X")], key=lambda s: int(s[1:]))
+    X = obs[x_cols].to_numpy()
+
     k = float(cfg.k_t)
     lam = float(cfg.lam_t)
+    tau = float(cfg.tau_log_hr)
+    beta_u = float(cfg.beta_u_in_t)
+
     G = math.gamma(1.0 + 1.0 / k)
+    xb = X @ params.beta_t
 
+    # Eq.(7): E[T(1)-T(0) | X, U] (oracle)
+    U = tru["U"].to_numpy()
+    cate_xu = (
+        lam * G
+        * np.exp(-(1.0 / k) * (xb + beta_u * U))
+        * (np.exp(-tau / k) - 1.0)
+    )
+
+    # Sample ITE
     ite = tru["T1"].to_numpy() - tru["T0"].to_numpy()
-    tru["ITE_T1_minus_T0"] = ite
 
-    eta_t0 = tru["eta_t0"].to_numpy()
-    eta_t1 = tru["eta_t1"].to_numpy()
-        
-    # General formula for Weibull PH CATE (generalizes Eq. 7)
-    # E[T(1) - T(0) | X,U] = λ * Γ(1 + 1/k) * (exp(-η₁/k) - exp(-η₀/k))
-    cate_xu = lam * G * (np.exp(-eta_t1 / k) - np.exp(-eta_t0 / k))
     tru["CATE_XU_eq7"] = cate_xu
+    tru["ITE_T1_minus_T0"] = ite
 
     return obs, tru
