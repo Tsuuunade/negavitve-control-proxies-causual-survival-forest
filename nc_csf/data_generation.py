@@ -64,7 +64,7 @@ class SynthConfig:
     lam_t: float = 0.4                          # Weibull scale
     tau_log_hr: float = -0.6                    # log hazard ratio for treatment effect (tau)
     beta_u_in_t: float = 0.8                    # U -> event time
-
+ 
     # Censoring time model (Weibull Cox PH)
     k_c: float = 1.2                            # Weibull shape
     lam_c: Optional[float] = None               # Weibull scale (if None, will be calibrated)
