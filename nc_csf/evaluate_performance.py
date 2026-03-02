@@ -59,8 +59,8 @@ def run_experiment(
     sigma_z=0.8,
     aW=1.0, 
     sigma_w=0.8,
-    linear_treatment=False,  # Placeholder (not used yet)
-    linear_outcome=False     # Placeholder (not used yet)
+    linear_treatment=False, 
+    linear_outcome=False
 ):
     """Run single experiment with flexible configuration."""
     cfg = SynthConfig(
@@ -136,8 +136,6 @@ def run_experiment(
     oracle.fit(Y=Y_tr, T=A_tr, X=X_tr, W=U_tr)
     pred_oracle = oracle.effect(X_te).ravel()
     results.append(evaluate_model(cate_te, pred_oracle, 'Oracle'))
-    
-    return pd.DataFrame(results), cate_te, pred_baseline, pred_nccsf, pred_oracle
     
     return pd.DataFrame(results), cate_te, pred_baseline, pred_nccsf, pred_oracle
 
