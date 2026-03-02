@@ -1,9 +1,9 @@
 """Diagnose why all survival models produce negative Pearson r."""
 import numpy as np
-from data_generation import SynthConfig, generate_synthetic_nc_cox, add_ground_truth_cate
+from .data_generation import SynthConfig, generate_synthetic_nc_cox, add_ground_truth_cate
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestRegressor
-from models import (
+from .models import (
     _fit_kaplan_meier_censoring, _evaluate_sc, _compute_ipcw_pseudo_outcome,
     _fit_event_cox, _predict_S_on_grid, _compute_Q_from_S, _compute_ipcw_3term_Y_res
 )

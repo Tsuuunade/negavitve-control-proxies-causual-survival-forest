@@ -1,7 +1,7 @@
 """Quick functional test of the 3-term IPCW survival models."""
 import numpy as np
-from data_generation import SynthConfig, generate_synthetic_nc_cox, add_ground_truth_cate
-from models import NCSurvivalForestDML, NCSurvivalForestDMLOracle, BaselineSurvivalForestDML
+from .data_generation import SynthConfig, generate_synthetic_nc_cox, add_ground_truth_cate
+from .models import NCSurvivalForestDML, NCSurvivalForestDMLOracle, BaselineSurvivalForestDML
 
 cfg = SynthConfig(n=500, p_x=5, seed=42, gamma_u_in_a=1.5, target_censor_rate=0.35)
 obs_df, truth_df, params = generate_synthetic_nc_cox(cfg)

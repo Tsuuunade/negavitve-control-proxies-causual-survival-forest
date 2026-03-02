@@ -7,8 +7,8 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from scipy.stats import pearsonr, spearmanr
-from data_generation import SynthConfig, generate_synthetic_nc_cox, add_ground_truth_cate
-from models import NCCausalForestDML, NCCausalForestDMLOracle, BaselineCausalForestDML
+from .data_generation import SynthConfig, generate_synthetic_nc_cox, add_ground_truth_cate
+from .models import NCCausalForestDML, NCCausalForestDMLOracle, BaselineCausalForestDML
 
 
 def evaluate_model(true_cate, pred_cate, name):
@@ -37,9 +37,55 @@ def evaluate_model(true_cate, pred_cate, name):
     }
 
 
-def run_experiment(seed, gamma_u=1.5, n=2000):
-    """Run single experiment."""
-    cfg = SynthConfig(n=n, gamma_u_in_a=gamma_u, seed=seed)
+def run_experiment(
+    n=2000, 
+    p_x=10, 
+    seed=123,
+    a_prevalence=0.5, 
+    gamma_u_in_a=1.0,
+    k_t=1.5, 
+    lam_t=0.4, 
+    tau_log_hr=-0.6, 
+    beta_u_in_t=0.8,
+    k_c=1.2, 
+    lam_c=None, 
+    beta_u_in_c=0.3, 
+    target_censor_rate=0.35,
+    max_censor_calib_iter=60, 
+    censor_lam_lo=1e-8, 
+    censor_lam_hi=1e6, 
+    admin_censor_time=None,
+    aZ=1.0, 
+    sigma_z=0.8,
+    aW=1.0, 
+    sigma_w=0.8,
+    linear_treatment=False,  # Placeholder (not used yet)
+    linear_outcome=False     # Placeholder (not used yet)
+):
+    """Run single experiment with flexible configuration."""
+    cfg = SynthConfig(
+        n=n,
+        p_x=p_x,
+        seed=seed,
+        a_prevalence=a_prevalence,
+        gamma_u_in_a=gamma_u_in_a,
+        k_t=k_t,
+        lam_t=lam_t,
+        tau_log_hr=tau_log_hr,
+        beta_u_in_t=beta_u_in_t,
+        k_c=k_c,
+        lam_c=lam_c,
+        beta_u_in_c=beta_u_in_c,
+        target_censor_rate=target_censor_rate,
+        max_censor_calib_iter=max_censor_calib_iter,
+        censor_lam_lo=censor_lam_lo,
+        censor_lam_hi=censor_lam_hi,
+        admin_censor_time=admin_censor_time,
+        aZ=aZ,
+        sigma_z=sigma_z,
+        aW=aW,
+        sigma_w=sigma_w,
+    )
     obs_df, truth_df, params = generate_synthetic_nc_cox(cfg)
     obs_df, truth_df = add_ground_truth_cate(obs_df, truth_df, cfg, params)
     
@@ -108,7 +154,7 @@ def main():
     all_results = []
     for seed in [42, 123, 456, 789, 1011]:
         print(f'  Running seed {seed}...')
-        df, _, _, _, _ = run_experiment(seed, gamma_u=1.5, n=2000)
+        df, _, _, _, _ = run_experiment(seed=seed, gamma_u_in_a=1.5, n=2000)
         df['seed'] = seed
         all_results.append(df)
     
@@ -129,7 +175,7 @@ def main():
     gamma_results = []
     for gamma in [0.0, 0.5, 1.0, 1.5, 2.0, 2.5]:
         print(f'  Running gamma_u={gamma}...')
-        df, _, _, _, _ = run_experiment(42, gamma_u=gamma, n=2000)
+        df, _, _, _, _ = run_experiment(seed=42, gamma_u_in_a=gamma, n=2000)
         df['gamma_u'] = gamma
         gamma_results.append(df)
     
@@ -157,7 +203,7 @@ def main():
     # 3. Detailed metrics
     print('\n\n3. DETAILED METRICS (gamma_u=1.5, seed=42)')
     print('-' * 70)
-    detail_df, cate_te, pred_baseline, pred_nccsf, pred_oracle = run_experiment(42, gamma_u=1.5, n=2000)
+    detail_df, cate_te, pred_baseline, pred_nccsf, pred_oracle = run_experiment(seed=42, gamma_u_in_a=1.5, n=2000)
     print(detail_df.to_string(index=False))
     
     # 4. Distribution analysis

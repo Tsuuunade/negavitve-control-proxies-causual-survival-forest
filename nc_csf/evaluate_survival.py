@@ -14,8 +14,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from scipy.stats import pearsonr, spearmanr
 
-from data_generation import SynthConfig, generate_synthetic_nc_cox, add_ground_truth_cate
-from models import (
+from .data_generation import SynthConfig, generate_synthetic_nc_cox, add_ground_truth_cate
+from .models import (
     NCSurvivalForestDML,
     NCSurvivalForestDMLOracle,
     BaselineSurvivalForestDML,
