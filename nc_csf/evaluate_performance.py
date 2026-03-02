@@ -82,12 +82,20 @@ def run_experiment(n, p_x, seed,
     
     results = []
     
-    # Baseline
+    # Baseline with X only (no Z/W)
     baseline = BaselineCausalForestDML(n_estimators=200, min_samples_leaf=20, random_state=seed)
     baseline.fit_baseline(X_tr, A_tr, Y_tr, verbose=False)
     pred_baseline = baseline.effect(X_te).ravel()
-    results.append(evaluate_model(cate_te, pred_baseline, 'Baseline'))
-    
+    results.append(evaluate_model(cate_te, pred_baseline, 'Baseline with X only'))
+
+    # Baseline with X, Z, W (concatenate Z and W into X as regular covariates)
+    X_full_tr = np.column_stack([X_tr, Z_tr, W_tr])
+    X_full_te = np.column_stack([X_te, Z_te, W_te])
+    baseline_full = BaselineCausalForestDML(n_estimators=200, min_samples_leaf=20, random_state=seed)
+    baseline_full.fit_baseline(X_full_tr, A_tr, Y_tr, verbose=False)
+    pred_baseline_full = baseline_full.effect(X_full_te).ravel()
+    results.append(evaluate_model(cate_te, pred_baseline_full, 'Baseline with X, Z, W'))
+
     # NC-CSF (cv=5 replaces n_crossfit_splits=5)
     nccsf = NCCausalForestDML(n_estimators=200, min_samples_leaf=20, cv=5, random_state=seed)
     nccsf.fit(Y=Y_tr, T=A_tr, X=X_tr, Z=Z_tr, W=W_tr)
